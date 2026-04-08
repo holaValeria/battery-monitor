@@ -5,7 +5,7 @@
 import time
 
 # 从其他模块导入我们需要的功能
-from config import BATTERY_THRESHOLD, CHECK_INTERVAL_SECONDS, NOTIFICATION_TITLE, NOTIFICATION_MESSAGE
+from config import BATTERY_THRESHOLD, CHECK_INTERVAL_SECONDS, REMINDER_INTERVAL_SECONDS, NOTIFICATION_TITLE, NOTIFICATION_MESSAGE
 from monitor import get_battery
 from notifier import notify
 
@@ -14,9 +14,9 @@ def main():
     print(f"将在电量达到 {BATTERY_THRESHOLD}% 时提醒你拔掉充电器。")
     print("按 Ctrl+C 可以停止程序。\n")
 
-    # 这个变量用来"记住"我们是否已经提醒过了。
-    # 避免每 60 秒就不停地弹窗，只在每次充电周期里提醒一次。
-    already_notified = False
+    # 记录上次提醒的时间（None 表示本次充电周期还没提醒过）
+    # 用时间戳而不是简单的 True/False，是为了判断"距上次提醒是否已过 3 分钟"
+    last_notified_time = None
 
     while True:  # 无限循环，直到用户手动停止
         battery = get_battery()
@@ -35,19 +35,28 @@ def main():
         # 核心判断逻辑：
         # 1. 正在充电
         # 2. 电量已达到阈值
-        # 3. 这次充电周期还没有提醒过
-        if plugged and percent >= BATTERY_THRESHOLD and not already_notified:
-            notify(NOTIFICATION_TITLE, NOTIFICATION_MESSAGE)
-            already_notified = True
-            print("已发出提醒！")
+        # 3. 还没提醒过，或距上次提醒已超过 3 分钟
+        if plugged and percent >= BATTERY_THRESHOLD:
+            never_notified = last_notified_time is None
+            enough_time_passed = not never_notified and (time.time() - last_notified_time) >= REMINDER_INTERVAL_SECONDS
 
-        # 如果拔掉了充电器，或者电量降回阈值以下，重置提醒标志
-        # 这样下次再插上充电器充到 80% 时，还会再提醒
+            if never_notified or enough_time_passed:
+                notify(NOTIFICATION_TITLE, NOTIFICATION_MESSAGE)
+                last_notified_time = time.time()
+                print("已发出提醒！")
+
+        # 如果拔掉了充电器，或者电量降回阈值以下，重置提醒状态
+        # 这样下次再插上充电器充到 80% 时，会重新开始提醒
         if not plugged or percent < BATTERY_THRESHOLD - 5:
-            already_notified = False
+            last_notified_time = None
 
-        # 等待一段时间再检查（默认 60 秒）
-        time.sleep(CHECK_INTERVAL_SECONDS)
+        # 睡眠时长：
+        # - 正在提醒模式中（插着电且超过阈值）→ 3 分钟后再检查，准备下一次提醒
+        # - 平时 → 10 分钟检查一次就够了
+        if plugged and percent >= BATTERY_THRESHOLD and last_notified_time is not None:
+            time.sleep(REMINDER_INTERVAL_SECONDS)
+        else:
+            time.sleep(CHECK_INTERVAL_SECONDS)
 
 
 if __name__ == "__main__":
