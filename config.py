@@ -5,8 +5,8 @@
 # 电量达到多少 % 时提醒（建议 80）
 BATTERY_THRESHOLD = 80
 
-# 每隔多少秒检查一次电量（10 分钟 = 600 秒）
-CHECK_INTERVAL_SECONDS = 600
+# 每隔多少秒检查一次电量（60 秒）
+CHECK_INTERVAL_SECONDS = 60
 
 # 提醒后如果仍未拔插头，每隔多少秒再次提醒（3 分钟 = 180 秒）
 REMINDER_INTERVAL_SECONDS = 180
